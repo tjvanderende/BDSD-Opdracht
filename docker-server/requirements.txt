@@ -1,0 +1,7 @@
+goose3
+pandas
+numpy
+twisted
+scrapy
+tldextract
+pymongo
