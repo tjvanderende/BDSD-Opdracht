@@ -1,6 +1,7 @@
 from goose3 import Goose
 import pandas as pd
 import numpy as np
+from scrapy import signals
 from twisted.internet import reactor
 from scrapy.crawler import CrawlerProcess
 import tldextract
@@ -34,53 +35,26 @@ client = mongod.MongoClient("mongodb://MONGODB:27017/")
 
 try:
 
-    os.remove("links.csv")
+    os.remove("links.json")
 except FileNotFoundError:
-    print("Nog geen links.csv, eerste keer starten")
-
+    print("Nog geen links.json, eerste keer starten")
 
 process = CrawlerProcess({
-    'FEED_URI': 'links.csv',
-    'FEED_FORMAT': 'csv'
+    'FEED_URI': 'links.json',
+    'FEED_FORMAT': 'json'
 })
 
 d = process.crawl(poli.PoliSitemapSpider, start_urls=[start_url], allowed_domains=[domain])
 d.addBoth(lambda _: reactor.stop())
 reactor.run() # the script will block here until the crawling is finished
 
-print("Klaar met sitemap genereren..")
 
-print("Start het artikelen ophalen:")
-g = Goose()
-url_list = pd.read_csv('./links.csv')
-urls = url_list['url']
-
-
-
-texts = []
-titles = []
-dates =[]
-for url in urls:
-    print("start scraping:", url)
-    try:
-
-        article = g.extract(url=url)
-        texts.append(article.cleaned_text)
-        titles.append(article.title)
-        dates.append(article.publish_date)
-        print("done scraping:", url)
-    except ValueError:
-        print('Error scraping')
-g.close()
-
-url_list['body'] = texts
-url_list['title'] = titles
-url_list['publish_dates'] = dates
-
-url_list.dropna(inplace=True)
+print("Klaar met artikelen genereren..")
+url_list = pd.read_json('./links.json')
 
 print("Klaar met alles inladen...")
 print("Alles wordt nu opgeslagen in de bigdata opslag...")
+
 
 db = client['admin']
 collection = db[domain]
