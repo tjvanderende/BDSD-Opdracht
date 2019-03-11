@@ -1,6 +1,10 @@
 #!/usr/bin/python
+import json
+import time
 
-from scrapy import Request, Item, Field
+from kafka import KafkaProducer
+from kafka.errors import KafkaError
+from scrapy import Request, Item, Field, log
 from scrapy.selector import HtmlXPathSelector
 from scrapy.spiders import Rule, CrawlSpider
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
@@ -19,7 +23,7 @@ class ScraperItem(Item):
 
 class PoliSitemapSpider (CrawlSpider):
     name = 'poli-sitemap-spider'
-
+    start_urls=["https://heerenveen.christenunie.nl"]
     rules = [
         Rule(
             LxmlLinkExtractor(
@@ -31,6 +35,7 @@ class PoliSitemapSpider (CrawlSpider):
             callback="parse_items"
         )
     ]
+
     def start_requests(self):
         for url in self.start_urls:
             yield Request(url, callback=self.parse, dont_filter=True)
@@ -46,6 +51,25 @@ class PoliSitemapSpider (CrawlSpider):
         item = ScraperItem()
         self.parse_article(article=article, item=item)
         items.append(item)
+
+        print("send with kafka")
+        self.producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('ascii'))
+
+
+        # produce json messages
+        future = self.producer.send('article', item.__dict__['_values'])
+
+
+        # Block for 'synchronous' sends
+        try:
+            record_metadata = future.get(timeout=10)
+            print(record_metadata)
+        except KafkaError:
+            # Decide what to do if produce request failed...
+            log.exception()
+            pass
+
+
         # Neem alle links door
         """for link in links:
             # Bekijk of het domein van de URL van de link is toegestaan door het domein te vergelijk met de domeinen in allowed_domains
